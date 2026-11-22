@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="en-GB"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Consultancy Utilisation Dashboard</title>
+<meta name="description" content="Anonymised portfolio sample by Omotayo Adesiyan: a consultancy utilisation and billability dashboard.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Source+Serif+4:wght@400&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<style>
+:root{--color-fg:#1f2328;--color-fg-muted:#5c6470;--color-bg:#fbfbfa;--color-panel:#ffffff;--color-border-line:#e3e2de;--color-ok:#1f7a4d;--color-bad:#b3261e;
+--font-anthropic-sans:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif;--font-anthropic-serif:"Source Serif 4",Georgia,serif;
+--cds-font-size-caption:.8rem;--cds-font-size-body:.92rem;--cds-font-size-heading:1.1rem;--cds-font-size-title:2rem;--cds-font-weight-medium:600;
+--cds-gap-xs:4px;--cds-gap-sm:8px;--cds-gap-md:14px;--cds-gap-lg:20px;--cds-gap-xl:32px;--cds-pad-xs:6px;--cds-pad-sm:10px;--cds-pad-lg:20px;--cds-radius:10px;
+--cds-chart-muted:#d9dde3;--cds-chart-status-critical:#c0392b;--cds-chart-grid:#eceae6;--cds-chart-axis:#c9c7c2;--cds-chart-reference:#1f2328;--cds-text-secondary:#5c6470;
+--cds-surface-popover:#ffffff;--cds-border:#d9d7d2;--cds-shadow-popover:0 4px 16px rgba(0,0,0,.12);--series-0:#2f5d8a;color-scheme:light}
+@media (prefers-color-scheme: dark){:root{--color-fg:#e8e6e3;--color-fg-muted:#a3a7ad;--color-bg:#16181b;--color-panel:#1e2125;--color-border-line:#30343a;--color-ok:#5cc28d;--color-bad:#f08a80;
+--cds-chart-muted:#3a4049;--cds-chart-status-critical:#e8695c;--cds-chart-grid:#2a2e33;--cds-chart-axis:#454a51;--cds-chart-reference:#e8e6e3;--cds-text-secondary:#a3a7ad;
+--cds-surface-popover:#24282d;--cds-border:#3a3f46;--series-0:#7fb0e0;color-scheme:dark}}
+body{margin:0;background:var(--color-bg);color:var(--color-fg);font-family:var(--font-anthropic-sans);font-size:15px}
+.wrap{max-width:1040px;margin:0 auto;padding-block:32px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.dash-skeleton{opacity:.4}
+
+.ud { display: flex; flex-direction: column; gap: var(--cds-gap-xl); }
+.ud-head h1 { font-family: var(--font-anthropic-serif); font-weight: 400; font-size: var(--cds-font-size-title); margin: 0 0 var(--cds-gap-sm); text-wrap: balance; }
+.ud-lede { color: var(--color-fg); max-width: 68ch; margin: 0; line-height: 1.5; }
+.ud-note { color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); margin: var(--cds-gap-sm) 0 0; max-width: 72ch; }
+.ud-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: var(--cds-gap-md); }
+.ud-card { background: var(--color-panel); border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); padding: var(--cds-pad-lg); min-width: 0; }
+.ud-kpi-label { color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); letter-spacing: .02em; }
+.ud-kpi-val { font-family: var(--font-anthropic-serif); font-weight: 400; font-size: 2rem; font-variant-numeric: tabular-nums; margin-top: var(--cds-gap-xs); }
+.ud-kpi-sub { color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); margin-top: var(--cds-gap-xs); }
+.ud h2 { font-size: var(--cds-font-size-heading); font-weight: var(--cds-font-weight-medium); margin: 0 0 var(--cds-gap-xs); }
+.ud-sub { color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); margin: 0 0 var(--cds-gap-md); }
+.ud-grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--cds-gap-lg); }
+.ud-chart { position: relative; min-height: 220px; }
+.ud-chart svg { display: block; overflow: visible; }
+.ud-chart .tick text, .ud-chart .lbl { fill: var(--cds-text-secondary); font-size: var(--cds-font-size-caption); font-family: var(--font-anthropic-sans); }
+.ud-chart .val { fill: var(--color-fg); font-size: var(--cds-font-size-caption); font-variant-numeric: tabular-nums; }
+.ud-chart .domain { stroke: var(--cds-chart-axis); }
+.ud-chart .tick line { stroke: var(--cds-chart-grid); }
+.ud-tip { position: absolute; pointer-events: none; background: var(--cds-surface-popover); border: 1px solid var(--cds-border); box-shadow: var(--cds-shadow-popover); border-radius: var(--cds-radius); padding: var(--cds-pad-xs) var(--cds-pad-sm); font-size: var(--cds-font-size-caption); white-space: nowrap; }
+.ud-tablewrap { overflow-x: auto; }
+.ud table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; font-size: var(--cds-font-size-body); }
+.ud th { text-align: left; color: var(--color-fg-muted); font-weight: var(--cds-font-weight-medium); font-size: var(--cds-font-size-caption); padding: var(--cds-pad-xs) var(--cds-pad-sm); border-bottom: 1px solid var(--color-border-line); white-space: nowrap; }
+.ud td { padding: var(--cds-pad-xs) var(--cds-pad-sm); border-bottom: 1px solid var(--color-border-line); white-space: nowrap; }
+.ud .num { text-align: right; }
+.ud .ok { color: var(--color-ok); }
+.ud .bad { color: var(--color-bad); }
+.ud-controls { display: flex; gap: var(--cds-gap-sm); align-items: center; flex-wrap: wrap; margin-bottom: var(--cds-gap-sm); }
+</style></head>
+<body><main class="wrap">
+<div class="ud">
+  <header class="ud-head" id="overview">
+    <h1>Consultancy Utilisation Dashboard</h1>
+    <p class="ud-lede">In H2 2025 the team billed <b data-draw="lede-rate" data-source="totals" data-field="billability" data-row="0">—</b> of <b data-draw="lede-worked" data-source="totals" data-field="worked" data-row="0">—</b> worked hours, and <b data-draw="lede-met" data-source="on_target">—</b> of <b data-draw="lede-head" data-source="totals" data-field="headcount" data-row="0">—</b> consultants met their billability target.</p>
+    <p class="ud-note">Anonymised portfolio sample by Omotayo Adesiyan. Rebuilt from a Looker Studio dashboard made for a venture building consultancy. The company totals (31 consultants, 21,222 worked hours, 18,090 billable hours, H2 2025) are real. Names, targets and the per-person, per-project and monthly splits are invented to match those totals and protect client data.</p>
+  </header>
+
+  <section class="ud-kpis" id="kpis" aria-label="Headline figures, July to December 2025">
+    <div class="ud-card">
+      <div class="ud-kpi-label">Worked hours · Jul to Dec 2025</div>
+      <div class="ud-kpi-val" data-draw="k-worked" data-source="totals" data-field="worked" data-row="0">—</div>
+      <div class="ud-kpi-sub">All logged time, billable or not</div>
+    </div>
+    <div class="ud-card">
+      <div class="ud-kpi-label">Billable hours · Jul to Dec 2025</div>
+      <div class="ud-kpi-val" data-draw="k-billable" data-source="totals" data-field="billable" data-row="0">—</div>
+      <div class="ud-kpi-sub">Time charged to client projects</div>
+    </div>
+    <div class="ud-card">
+      <div class="ud-kpi-label">Billability · Jul to Dec 2025</div>
+      <div class="ud-kpi-val" data-draw="k-rate" data-source="totals" data-field="billability" data-row="0">—</div>
+      <div class="ud-kpi-sub">Billable hours ÷ worked hours</div>
+    </div>
+    <div class="ud-card">
+      <div class="ud-kpi-label">Consultants on target</div>
+      <div class="ud-kpi-val"><span data-draw="k-met" data-source="on_target">—</span> of <span data-draw="k-head" data-source="totals" data-field="headcount" data-row="0">—</span></div>
+      <div class="ud-kpi-sub">Met or beat their level's billability goal</div>
+    </div>
+  </section>
+
+  <section class="ud-card" id="monthly">
+    <h2>Billability by month</h2>
+    <p class="ud-sub">Bars show worked hours; the line shows the share that was billable.</p>
+    <div class="ud-chart" data-draw="monthly-chart" data-source="monthly_calc"></div>
+  </section>
+
+  <section class="ud-grid2">
+    <div class="ud-card" id="by-level">
+      <h2>Billability by level against goal</h2>
+      <p class="ud-sub">Each bar is the level's billability; the tick marks its goal.</p>
+      <div class="ud-chart" data-draw="level-chart" data-source="by_level"></div>
+    </div>
+    <div class="ud-card" id="by-service">
+      <h2>Billable hours by service type</h2>
+      <p class="ud-sub">Where client time went across the half year.</p>
+      <div class="ud-chart" data-draw="service-chart" data-source="by_service"></div>
+    </div>
+  </section>
+
+  <section class="ud-card" id="team">
+    <h2>Team member utilisation</h2>
+    <p class="ud-sub">Gap to target is billability minus the goal for that person's level. Below goal shows in red.</p>
+    <div class="ud-tablewrap">
+      <table data-source="people_calc" data-row-key="consultant">
+        <thead><tr>
+          <th data-field="consultant">Consultant</th>
+          <th data-field="level">Level</th>
+          <th class="num" data-field="worked">Worked h</th>
+          <th class="num" data-field="billable">Billable h</th>
+          <th class="num" data-field="billability">Billability</th>
+          <th class="num" data-field="target">Goal</th>
+          <th class="num" data-field="gap">Gap to goal</th>
+        </tr></thead>
+        <tbody data-draw="team-rows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="ud-card" id="projects">
+    <h2>Project intelligence</h2>
+    <p class="ud-sub">Billable hours per client project, largest first.</p>
+    <div class="ud-chart" data-draw="project-chart" data-source="projects"></div>
+  </section>
+</div>
+</main>
+<script>
+(function(){
+const RAW={"people": [{"consultant": "Consultant 01", "level": "Director", "worked_hours": "573", "billable_hours": "381", "target_billability": "0.6"}, {"consultant": "Consultant 02", "level": "Director", "worked_hours": "537", "billable_hours": "323", "target_billability": "0.6"}, {"consultant": "Consultant 03", "level": "Director", "worked_hours": "540", "billable_hours": "339", "target_billability": "0.6"}, {"consultant": "Consultant 04", "level": "Senior", "worked_hours": "765", "billable_hours": "617", "target_billability": "0.8"}, {"consultant": "Consultant 05", "level": "Senior", "worked_hours": "627", "billable_hours": "536", "target_billability": "0.8"}, {"consultant": "Consultant 06", "level": "Senior", "worked_hours": "635", "billable_hours": "513", "target_billability": "0.8"}, {"consultant": "Consultant 07", "level": "Senior", "worked_hours": "726", "billable_hours": "577", "target_billability": "0.8"}, {"consultant": "Consultant 08", "level": "Senior", "worked_hours": "757", "billable_hours": "639", "target_billability": "0.8"}, {"consultant": "Consultant 09", "level": "Senior", "worked_hours": "723", "billable_hours": "641", "target_billability": "0.8"}, {"consultant": "Consultant 10", "level": "Senior", "worked_hours": "671", "billable_hours": "570", "target_billability": "0.8"}, {"consultant": "Consultant 11", "level": "Senior", "worked_hours": "776", "billable_hours": "629", "target_billability": "0.8"}, {"consultant": "Consultant 12", "level": "Medior", "worked_hours": "765", "billable_hours": "671", "target_billability": "0.88"}, {"consultant": "Consultant 13", "level": "Medior", "worked_hours": "716", "billable_hours": "658", "target_billability": "0.88"}, {"consultant": "Consultant 14", "level": "Medior", "worked_hours": "758", "billable_hours": "680", "target_billability": "0.88"}, {"consultant": "Consultant 15", "level": "Medior", "worked_hours": "647", "billable_hours": "569", "target_billability": "0.88"}, {"consultant": "Consultant 16", "level": "Medior", "worked_hours": "643", "billable_hours": "587", "target_billability": "0.88"}, {"consultant": "Consultant 17", "level": "Medior", "worked_hours": "762", "billable_hours": "650", "target_billability": "0.88"}, {"consultant": "Consultant 18", "level": "Medior", "worked_hours": "660", "billable_hours": "641", "target_billability": "0.88"}, {"consultant": "Consultant 19", "level": "Medior", "worked_hours": "639", "billable_hours": "527", "target_billability": "0.88"}, {"consultant": "Consultant 20", "level": "Medior", "worked_hours": "710", "billable_hours": "604", "target_billability": "0.88"}, {"consultant": "Consultant 21", "level": "Medior", "worked_hours": "637", "billable_hours": "554", "target_billability": "0.88"}, {"consultant": "Consultant 22", "level": "Junior", "worked_hours": "628", "billable_hours": "559", "target_billability": "0.9"}, {"consultant": "Consultant 23", "level": "Junior", "worked_hours": "774", "billable_hours": "710", "target_billability": "0.9"}, {"consultant": "Consultant 24", "level": "Junior", "worked_hours": "724", "billable_hours": "701", "target_billability": "0.9"}, {"consultant": "Consultant 25", "level": "Junior", "worked_hours": "694", "billable_hours": "546", "target_billability": "0.9"}, {"consultant": "Consultant 26", "level": "Junior", "worked_hours": "707", "billable_hours": "650", "target_billability": "0.9"}, {"consultant": "Consultant 27", "level": "Junior", "worked_hours": "690", "billable_hours": "619", "target_billability": "0.9"}, {"consultant": "Consultant 28", "level": "Junior", "worked_hours": "676", "billable_hours": "627", "target_billability": "0.9"}, {"consultant": "Consultant 29", "level": "Junior", "worked_hours": "633", "billable_hours": "533", "target_billability": "0.9"}, {"consultant": "Consultant 30", "level": "Junior", "worked_hours": "701", "billable_hours": "609", "target_billability": "0.9"}, {"consultant": "Consultant 31", "level": "Junior", "worked_hours": "728", "billable_hours": "630", "target_billability": "0.9"}], "projects": [{"project": "Venture M", "service_type": "Corporate Innovation Strategy", "billable_hours": "2050"}, {"project": "Venture E", "service_type": "Go-to-Market", "billable_hours": "2035"}, {"project": "Venture K", "service_type": "Venture Building", "billable_hours": "1855"}, {"project": "Venture N", "service_type": "Product Design", "billable_hours": "1630"}, {"project": "Venture B", "service_type": "Validation Sprint", "billable_hours": "1537"}, {"project": "Venture H", "service_type": "Corporate Innovation Strategy", "billable_hours": "1490"}, {"project": "Venture I", "service_type": "Product Design", "billable_hours": "1353"}, {"project": "Venture C", "service_type": "Corporate Innovation Strategy", "billable_hours": "1346"}, {"project": "Venture F", "service_type": "Venture Building", "billable_hours": "1191"}, {"project": "Venture D", "service_type": "Product Design", "billable_hours": "831"}, {"project": "Venture G", "service_type": "Validation Sprint", "billable_hours": "805"}, {"project": "Venture A", "service_type": "Venture Building", "billable_hours": "738"}, {"project": "Venture L", "service_type": "Validation Sprint", "billable_hours": "653"}, {"project": "Venture J", "service_type": "Go-to-Market", "billable_hours": "576"}], "monthly": [{"month": "2025-07", "worked_hours": "3597", "billable_hours": "3021"}, {"month": "2025-08", "worked_hours": "2949", "billable_hours": "2448"}, {"month": "2025-09", "worked_hours": "3777", "billable_hours": "3248"}, {"month": "2025-10", "worked_hours": "3957", "billable_hours": "3464"}, {"month": "2025-11", "worked_hours": "3885", "billable_hours": "3341"}, {"month": "2025-12", "worked_hours": "3057", "billable_hours": "2568"}]};const calcs={};const draws=[];
+const dash={colors:['var(--series-0)'],
+calc(id,o){calcs[id]=o;},
+data(id){ if(RAW[id]) return {status:'ok',data:RAW[id]}; const c=calcs[id]; if(!c) return {status:'missing',data:[]};
+ const ins=c.inputs.map(i=>dash.data(i).data); return {status:'ok',data:c.fn(...ins)}; },
+draw(name,fn){draws.push([name,fn]);},
+params(){return {};}};
+window.dash=dash;
+window.__runDraws=function(){draws.forEach(([n,fn])=>document.querySelectorAll('[data-draw="'+n+'"]').forEach(el=>{try{fn(el)}catch(e){console.error(n,e)}}));};
+})();
+</script>
+<script>(function(){
+const pct = d3.format('.1%');
+const num = d3.format(',');
+
+dash.calc('people_calc', {
+  title: 'Consultant billability and gap to goal',
+  description: 'Billable hours divided by worked hours for each consultant, compared with the goal for their level.',
+  inputs: ['people'],
+  fn: (people) => people.map((p) => {
+    const worked = +p.worked_hours, billable = +p.billable_hours, target = +p.target_billability;
+    const billability = worked ? billable / worked : 0;
+    return { consultant: p.consultant, level: p.level, worked, billable, billability, target, gap: billability - target };
+  })
+});
+
+dash.calc('totals', {
+  title: 'Company totals',
+  description: 'Sum of worked and billable hours across all consultants, and their ratio.',
+  inputs: ['people'],
+  fn: (people) => {
+    const worked = d3.sum(people, (p) => +p.worked_hours);
+    const billable = d3.sum(people, (p) => +p.billable_hours);
+    return [{ worked, billable, billability: worked ? billable / worked : 0, headcount: people.length }];
+  }
+});
+
+dash.calc('on_target', {
+  title: 'Consultants on target',
+  description: 'Count of consultants whose billability met or beat the goal for their level.',
+  inputs: ['people'],
+  fn: (people) => people.filter((p) => (+p.billable_hours / +p.worked_hours) >= +p.target_billability).length
+});
+
+dash.calc('by_level', {
+  title: 'Billability by level',
+  description: 'Worked and billable hours summed per level, their ratio, and the level goal.',
+  inputs: ['people'],
+  fn: (people) => ['Director', 'Senior', 'Medior', 'Junior'].map((level) => {
+    const rows = people.filter((p) => p.level === level);
+    const worked = d3.sum(rows, (p) => +p.worked_hours), billable = d3.sum(rows, (p) => +p.billable_hours);
+    return { level, headcount: rows.length, worked, billable, billability: worked ? billable / worked : 0, target: rows.length ? +rows[0].target_billability : 0 };
+  })
+});
+
+dash.calc('by_service', {
+  title: 'Billable hours by service type',
+  description: 'Project billable hours summed per service type, with each type\'s share of the total.',
+  inputs: ['projects'],
+  fn: (projects) => {
+    const total = d3.sum(projects, (p) => +p.billable_hours);
+    return d3.rollups(projects, (v) => d3.sum(v, (p) => +p.billable_hours), (p) => p.service_type)
+      .map(([service_type, hours]) => ({ service_type, hours, share: total ? hours / total : 0 }))
+      .sort((a, b) => b.hours - a.hours);
+  }
+});
+
+dash.calc('monthly_calc', {
+  title: 'Billability by month',
+  description: 'Billable hours divided by worked hours for each month.',
+  inputs: ['monthly'],
+  fn: (monthly) => monthly.map((m) => ({ month: m.month, worked: +m.worked_hours, billable: +m.billable_hours, billability: +m.worked_hours ? +m.billable_hours / +m.worked_hours : 0 }))
+});
+})();</script><script>(function(){
+const pct = d3.format('.1%');
+const num = d3.format(',');
+function udText(name, source, pick) {
+  dash.draw(name, (el) => {
+    const d = dash.data(source);
+    el.classList.toggle('dash-skeleton', d.status === 'loading');
+    el.textContent = d.status === 'ok' && d.data != null ? pick(d.data) : '—';
+  });
+}
+udText('lede-rate', 'totals', (r) => pct(r[0].billability));
+udText('lede-worked', 'totals', (r) => num(r[0].worked));
+udText('lede-head', 'totals', (r) => String(r[0].headcount));
+udText('lede-met', 'on_target', (v) => String(v));
+udText('k-worked', 'totals', (r) => num(r[0].worked));
+udText('k-billable', 'totals', (r) => num(r[0].billable));
+udText('k-rate', 'totals', (r) => pct(r[0].billability));
+udText('k-met', 'on_target', (v) => String(v));
+udText('k-head', 'totals', (r) => String(r[0].headcount));
+
+function udFail(el, d) {
+  el.replaceChildren();
+  const p = document.createElement('p');
+  p.className = 'ud-sub';
+  p.textContent = d.status === 'error' ? 'This chart could not load its data.' : '—';
+  el.appendChild(p);
+}
+
+function udTip(el) {
+  let t = el.querySelector('.ud-tip');
+  if (!t) { t = document.createElement('div'); t.className = 'ud-tip'; t.hidden = true; el.appendChild(t); }
+  return t;
+}
+function udShow(el, tip, ev, text) {
+  const r = el.getBoundingClientRect();
+  tip.textContent = text; tip.hidden = false;
+  let x = ev.clientX - r.left + 12, y = ev.clientY - r.top - 28;
+  x = Math.min(x, el.clientWidth - tip.offsetWidth - 4); x = Math.max(0, x);
+  tip.style.left = x + 'px'; tip.style.top = Math.max(0, y) + 'px';
+}
+
+// Monthly: bars of worked hours, line of billability
+dash.draw('monthly-chart', (el) => {
+  const d = dash.data('monthly_calc');
+  if (d.status !== 'ok' || !d.data || !d.data.length) return udFail(el, d);
+  el.replaceChildren();
+  const rows = d.data, W = el.clientWidth || 600, H = 240, m = { t: 16, r: 44, b: 28, l: 48 };
+  const parse = d3.utcParse('%Y-%m'), fmt = d3.utcFormat('%b');
+  const x = d3.scaleBand().domain(rows.map((r) => r.month)).range([m.l, W - m.r]).padding(0.3);
+  const y = d3.scaleLinear().domain([0, d3.max(rows, (r) => r.worked) * 1.1]).nice().range([H - m.b, m.t]);
+  const y2 = d3.scaleLinear().domain([0.7, 1]).range([H - m.b, m.t]);
+  const svg = d3.select(el).append('svg').attr('width', '100%').attr('height', H).attr('viewBox', `0 0 ${W} ${H}`)
+    .attr('role', 'img').attr('aria-label', 'Worked hours and billability by month, July to December 2025');
+  svg.append('g').attr('transform', `translate(0,${H - m.b})`).call(d3.axisBottom(x).tickFormat((v) => fmt(parse(v))).tickSizeOuter(0));
+  svg.append('g').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(4).tickFormat(d3.format('~s')).tickSize(-(W - m.l - m.r))).call((g) => g.select('.domain').remove());
+  svg.append('g').attr('transform', `translate(${W - m.r},0)`).call(d3.axisRight(y2).ticks(3).tickFormat(d3.format('.0%'))).call((g) => g.select('.domain').remove());
+  const tip = udTip(el);
+  svg.append('g').selectAll('rect').data(rows).join('rect')
+    .attr('x', (r) => x(r.month)).attr('width', x.bandwidth()).attr('y', (r) => y(r.worked)).attr('height', (r) => y(0) - y(r.worked))
+    .style('fill', 'var(--cds-chart-muted)')
+    .on('pointermove', (ev, r) => udShow(el, tip, ev, `${fmt(parse(r.month))}: ${num(r.worked)} worked h, ${num(r.billable)} billable h, ${pct(r.billability)}`))
+    .on('pointerleave', () => { tip.hidden = true; });
+  const line = d3.line().x((r) => x(r.month) + x.bandwidth() / 2).y((r) => y2(r.billability));
+  svg.append('path').datum(rows).attr('d', line).style('fill', 'none').style('stroke', dash.colors[0]).style('stroke-width', 2.5);
+  svg.append('g').selectAll('circle').data(rows).join('circle')
+    .attr('cx', (r) => x(r.month) + x.bandwidth() / 2).attr('cy', (r) => y2(r.billability)).attr('r', 4).style('fill', dash.colors[0]);
+  svg.append('g').selectAll('text').data(rows).join('text').attr('class', 'val')
+    .attr('x', (r) => x(r.month) + x.bandwidth() / 2).attr('y', (r) => y2(r.billability) - 10).attr('text-anchor', 'middle')
+    .text((r) => d3.format('.0%')(r.billability));
+});
+
+// Level: horizontal bars with goal ticks
+dash.draw('level-chart', (el) => {
+  const d = dash.data('by_level');
+  if (d.status !== 'ok' || !d.data || !d.data.length) return udFail(el, d);
+  el.replaceChildren();
+  const rows = d.data, W = el.clientWidth || 400, rowH = 40, m = { t: 8, r: 52, b: 24, l: 70 }, H = m.t + m.b + rows.length * rowH;
+  const x = d3.scaleLinear().domain([0, 1]).range([m.l, W - m.r]);
+  const y = d3.scaleBand().domain(rows.map((r) => r.level)).range([m.t, H - m.b]).padding(0.35);
+  const svg = d3.select(el).append('svg').attr('width', '100%').attr('height', H).attr('viewBox', `0 0 ${W} ${H}`)
+    .attr('role', 'img').attr('aria-label', 'Billability by consultant level, with each level\'s goal');
+  svg.append('g').attr('transform', `translate(0,${H - m.b})`).call(d3.axisBottom(x).ticks(4).tickFormat(d3.format('.0%')).tickSize(-(H - m.t - m.b))).call((g) => g.select('.domain').remove());
+  svg.append('g').selectAll('text').data(rows).join('text').attr('class', 'lbl')
+    .attr('x', m.l - 8).attr('y', (r) => y(r.level) + y.bandwidth() / 2).attr('dy', '0.35em').attr('text-anchor', 'end').text((r) => r.level);
+  const tip = udTip(el);
+  svg.append('g').selectAll('rect').data(rows).join('rect')
+    .attr('x', x(0)).attr('y', (r) => y(r.level)).attr('height', y.bandwidth()).attr('width', (r) => x(r.billability) - x(0))
+    .style('fill', (r) => r.billability >= r.target ? dash.colors[0] : 'var(--cds-chart-status-critical)')
+    .on('pointermove', (ev, r) => udShow(el, tip, ev, `${r.level} (${r.headcount}): ${pct(r.billability)} vs goal ${d3.format('.0%')(r.target)}`))
+    .on('pointerleave', () => { tip.hidden = true; });
+  svg.append('g').selectAll('line').data(rows).join('line')
+    .attr('x1', (r) => x(r.target)).attr('x2', (r) => x(r.target)).attr('y1', (r) => y(r.level) - 4).attr('y2', (r) => y(r.level) + y.bandwidth() + 4)
+    .style('stroke', 'var(--cds-chart-reference)').style('stroke-width', 2);
+  svg.append('g').selectAll('text').data(rows).join('text').attr('class', 'val')
+    .attr('x', (r) => Math.max(x(r.billability), x(r.target)) + 6).attr('y', (r) => y(r.level) + y.bandwidth() / 2).attr('dy', '0.35em').text((r) => pct(r.billability));
+});
+
+// Service type: horizontal bars of hours
+function udHBars(el, rows, key, val, label, aria) {
+  el.replaceChildren();
+  const W = el.clientWidth || 400, rowH = 30;
+  const svg = d3.select(el).append('svg').attr('role', 'img').attr('aria-label', aria);
+  const probe = svg.append('text').attr('class', 'lbl');
+  const lw = d3.max(rows, (r) => { probe.text(r[key]); return probe.node().getComputedTextLength(); }) || 80;
+  probe.remove();
+  const m = { t: 4, r: 96, b: 4, l: Math.min(lw + 12, W * 0.45) }, H = m.t + m.b + rows.length * rowH;
+  svg.attr('width', '100%').attr('height', H).attr('viewBox', `0 0 ${W} ${H}`);
+  const x = d3.scaleLinear().domain([0, d3.max(rows, (r) => r[val])]).range([m.l, W - m.r]);
+  const y = d3.scaleBand().domain(rows.map((r) => r[key])).range([m.t, H - m.b]).padding(0.28);
+  svg.append('g').selectAll('text').data(rows).join('text').attr('class', 'lbl')
+    .attr('x', m.l - 8).attr('y', (r) => y(r[key]) + y.bandwidth() / 2).attr('dy', '0.35em').attr('text-anchor', 'end').text((r) => r[key]);
+  const tip = udTip(el);
+  svg.append('g').selectAll('rect').data(rows).join('rect')
+    .attr('x', x(0)).attr('y', (r) => y(r[key])).attr('height', y.bandwidth()).attr('width', (r) => Math.max(1, x(r[val]) - x(0)))
+    .style('fill', dash.colors[0])
+    .on('pointermove', (ev, r) => udShow(el, tip, ev, `${r[key]}: ${label(r)}`))
+    .on('pointerleave', () => { tip.hidden = true; });
+  svg.append('g').selectAll('text').data(rows).join('text').attr('class', 'val')
+    .attr('x', (r) => x(r[val]) + 6).attr('y', (r) => y(r[key]) + y.bandwidth() / 2).attr('dy', '0.35em').text((r) => label(r));
+}
+
+dash.draw('service-chart', (el) => {
+  const d = dash.data('by_service');
+  if (d.status !== 'ok' || !d.data || !d.data.length) return udFail(el, d);
+  udHBars(el, d.data, 'service_type', 'hours', (r) => `${num(r.hours)} h · ${d3.format('.0%')(r.share)}`, 'Billable hours by service type');
+});
+
+dash.draw('project-chart', (el) => {
+  const d = dash.data('projects');
+  if (d.status !== 'ok' || !d.data || !d.data.length) return udFail(el, d);
+  const rows = d.data.map((p) => ({ project: p.project, service: p.service_type, hours: +p.billable_hours })).sort((a, b) => b.hours - a.hours);
+  udHBars(el, rows, 'project', 'hours', (r) => `${num(r.hours)} h`, 'Billable hours per client project');
+});
+
+
+// Team table
+dash.draw('team-rows', (tb) => {
+  const d = dash.data('people_calc');
+  tb.replaceChildren();
+  if (d.status !== 'ok' || !d.data) {
+    const tr = tb.insertRow(); const td = tr.insertCell(); td.colSpan = 7;
+    td.textContent = d.status === 'error' ? 'The team table could not load its data.' : '—';
+    return;
+  }
+  d.data.slice().sort((a, b) => a.gap - b.gap).forEach((r) => {
+    const tr = tb.insertRow(); tr.dataset.key = r.consultant;
+    const cells = [r.consultant, r.level, num(r.worked), num(r.billable), pct(r.billability), d3.format('.0%')(r.target), (r.gap >= 0 ? '+' : '') + d3.format('.1f')(r.gap * 100) + ' pts'];
+    cells.forEach((v, i) => { const td = tr.insertCell(); td.textContent = v; if (i > 1) td.className = 'num'; if (i === 6) td.classList.add(r.gap >= 0 ? 'ok' : 'bad'); });
+  });
+});
+})();</script>
+<script>window.__runDraws();let __t;window.addEventListener('resize',()=>{clearTimeout(__t);__t=setTimeout(window.__runDraws,150)});</script>
+</body></html>
